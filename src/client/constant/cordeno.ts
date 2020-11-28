@@ -1,13 +1,8 @@
-enum Cordeno {
+export enum Cordeno {
   Name = "cordeno",
   Version = "0.3.5",
 }
 
-interface CordenoOptions {
+export interface CordenoOptions {
   token: string;
 }
-
-export {
-  Cordeno,
-  CordenoOptions,
-};
