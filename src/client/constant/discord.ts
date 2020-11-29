@@ -1,9 +1,9 @@
-enum Discord {
+export enum Discord {
   Endpoint = "wss://gateway.discord.gg/?v=6&encoding=json",
   Rest = "https://discordapp.com/api/v6",
 }
 
-enum OPCODE {
+export enum OPCODE {
   Dispatch = 0,
   Heartbeat = 1,
   Identify = 2,
@@ -17,14 +17,9 @@ enum OPCODE {
   HeartbeatACK = 11,
 }
 
-interface Payload {
+export interface Payload {
   op: number;
   d: any;
   s?: number;
   t?: string;
 }
-export {
-  Discord,
-  Payload,
-  OPCODE,
-};

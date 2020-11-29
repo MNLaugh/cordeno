@@ -9,8 +9,7 @@ Status codes
 */
 
 import {
-  connectWebSocket,
-  WebSocket,
+  //connectWebSocket,
   DenoAsync,
   isWebSocketCloseEvent,
 } from "../../../deps.ts";
@@ -40,58 +39,57 @@ export class WebSocketManager {
   // Connects to API
   async connect() {
     try {
-      this.socket = await connectWebSocket(this.clientCache.gateway);
+      console.log("gateway: ", this.clientCache.gateway)
+      this.socket = new WebSocket(this.clientCache.gateway);
 
-      for await (const msg of this.socket) {
-        if (isWebSocketCloseEvent(msg)) {
-          this.connectionClosed(msg.code);
-          break;
-        } else if (typeof msg === "string") {
-          const payload: Payload = JSON.parse(msg.toString());
+      this.socket.onmessage = async event => {
+        const msg = event.data
+        const payload: Payload = JSON.parse(msg.toString());
 
-          //Grabs last sequence number
-          if (payload.s) {
-            this.clientCache.sequence = payload.s;
+        //Grabs last sequence number
+        if (payload.s) {
+          this.clientCache.sequence = payload.s;
+        }
+
+        if (payload.op === OPCODE.Dispatch) {
+          this.client.event.post(payload.t, payload);
+        }
+        switch (payload.op) {
+          case OPCODE.Hello: {
+            this.identify();
+            this.heartbeatInterval(payload.d.heartbeat_interval);
+            break;
           }
-
-          if (payload.op === OPCODE.Dispatch) {
-            this.client.event.post(payload.t, payload);
+          case OPCODE.Heartbeat: {
+            this.heartbeat.recieved = true;
+            this.heartbeatSend();
+            break;
           }
-          switch (payload.op) {
-            case OPCODE.Hello: {
-              this.identify();
-              this.heartbeatInterval(payload.d.heartbeat_interval);
-              break;
+          case OPCODE.HeartbeatACK: {
+            this.heartbeat.recieved = true;
+            break;
+          }
+          case OPCODE.Reconnect: {
+            this.client.event.post("RESUMED", {
+              reconnectRequested: true,
+            });
+            await this.reconnect();
+            break;
+          }
+          case OPCODE.InvalidSession: {
+            this.client.event.post("INVALID_SESSION", payload);
+            await DenoAsync.delay(5000);
+            if (payload.d === true) {
+              this.reconnect();
+            } else {
+              this.reconnect(true);
             }
-            case OPCODE.Heartbeat: {
-              this.heartbeat.recieved = true;
-              this.heartbeatSend();
-              break;
-            }
-            case OPCODE.HeartbeatACK: {
-              this.heartbeat.recieved = true;
-              break;
-            }
-            case OPCODE.Reconnect: {
-              this.client.event.post("RESUMED", {
-                reconnectRequested: true,
-              });
-              await this.reconnect();
-              break;
-            }
-            case OPCODE.InvalidSession: {
-              this.client.event.post("INVALID_SESSION", payload);
-              await DenoAsync.delay(5000);
-              if (payload.d === true) {
-                this.reconnect();
-              } else {
-                this.reconnect(true);
-              }
-              break;
-            }
+            break;
           }
         }
       }
+
+      this.socket.onclose = event => this.connectionClosed(event.code);
     } catch (e) {
       this.reconnect(true);
     }
@@ -141,7 +139,7 @@ export class WebSocketManager {
 
   // Starts the beat interval
   async heartbeatInterval(rate: number) {
-    if (this.socket.isClosed) return this.reconnect();
+    if (this.socket.readyState === WebSocket.CLOSED) return this.reconnect();
     this.heartbeat.rate = rate;
     this.heartbeat.interval = setInterval(() => {
       this.heartbeatSend();
@@ -173,8 +171,8 @@ export class WebSocketManager {
     clearInterval(this.heartbeat.interval);
 
     // If sockets still open, close | Don't close socket if closeCode is 1000
-    if (!this.socket.isClosed) {
-      this.socket.close(code).catch();
+    if (this.socket.readyState !== WebSocket.CLOSED) {
+      this.socket.close(code)
     }
   }
 
