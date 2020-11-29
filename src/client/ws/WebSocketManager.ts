@@ -9,9 +9,7 @@ Status codes
 */
 
 import {
-  //connectWebSocket,
-  DenoAsync,
-  isWebSocketCloseEvent,
+  DenoAsync
 } from "../../../deps.ts";
 import { Discord, Payload, OPCODE } from "../constant/discord.ts";
 import { Cordeno } from "../constant/cordeno.ts";
